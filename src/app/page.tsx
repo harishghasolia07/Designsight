@@ -1,103 +1,244 @@
-import Image from "next/image";
+'use client';
 
-export default function Home() {
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Plus, Upload, Eye, Calendar } from 'lucide-react';
+
+interface Project {
+  _id: string;
+  name: string;
+  description?: string;
+  createdAt: string;
+  ownerId: string;
+}
+
+interface Image {
+  _id: string;
+  projectId: string;
+  filename: string;
+  url: string;
+  status: 'uploaded' | 'processing' | 'done' | 'failed';
+  uploadedAt: string;
+}
+
+export default function Dashboard() {
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [recentImages, setRecentImages] = useState<Image[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showCreateProject, setShowCreateProject] = useState(false);
+  const [newProjectName, setNewProjectName] = useState('');
+  const [newProjectDescription, setNewProjectDescription] = useState('');
+
+  useEffect(() => {
+    fetchProjects();
+    fetchRecentImages();
+  }, []);
+
+  const fetchProjects = async () => {
+    try {
+      const response = await fetch('/api/projects');
+      const data = await response.json();
+      if (data.success) {
+        setProjects(data.data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch projects:', error);
+    }
+  };
+
+  const fetchRecentImages = async () => {
+    try {
+      // This is a simplified version - in reality, you'd have a separate endpoint
+      // for recent images across all projects
+      setRecentImages([]);
+    } catch (error) {
+      console.error('Failed to fetch recent images:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const createProject = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newProjectName.trim()) return;
+
+    try {
+      const response = await fetch('/api/projects', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: newProjectName,
+          description: newProjectDescription,
+          ownerId: '60f1b0b3e6b3a12f8c123456' // Mock user ID for MVP
+        }),
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setProjects([data.data, ...projects]);
+        setNewProjectName('');
+        setNewProjectDescription('');
+        setShowCreateProject(false);
+      }
+    } catch (error) {
+      console.error('Failed to create project:', error);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <header className="border-b">
+        <div className="container mx-auto px-4 py-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-foreground">DesignSight</h1>
+              <p className="text-muted-foreground mt-1">
+                AI-powered design feedback and collaboration
+              </p>
+            </div>
+            <Button onClick={() => setShowCreateProject(true)}>
+              <Plus className="w-4 h-4 mr-2" />
+              New Project
+            </Button>
+          </div>
+        </div>
+      </header>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+      <main className="container mx-auto px-4 py-8">
+        {/* Create Project Form */}
+        {showCreateProject && (
+          <Card className="mb-8">
+            <CardHeader>
+              <CardTitle>Create New Project</CardTitle>
+              <CardDescription>
+                Start a new design feedback project
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={createProject} className="space-y-4">
+                <div>
+                  <Input
+                    placeholder="Project name"
+                    value={newProjectName}
+                    onChange={(e) => setNewProjectName(e.target.value)}
+                    required
+                  />
+                </div>
+                <div>
+                  <Input
+                    placeholder="Description (optional)"
+                    value={newProjectDescription}
+                    onChange={(e) => setNewProjectDescription(e.target.value)}
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button type="submit">Create Project</Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowCreateProject(false)}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Projects Grid */}
+        <div className="mb-8">
+          <h2 className="text-2xl font-semibold mb-4">Your Projects</h2>
+          {projects.length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <Upload className="w-12 h-12 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-semibold mb-2">No projects yet</h3>
+                <p className="text-muted-foreground text-center mb-4">
+                  Create your first project to start getting AI-powered design feedback
+                </p>
+                <Button onClick={() => setShowCreateProject(true)}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create Project
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {projects.map((project) => (
+                <Link key={project._id} href={`/projects/${project._id}`}>
+                  <Card className="hover:shadow-md transition-shadow cursor-pointer">
+                    <CardHeader>
+                      <CardTitle className="line-clamp-1">{project.name}</CardTitle>
+                      {project.description && (
+                        <CardDescription className="line-clamp-2">
+                          {project.description}
+                        </CardDescription>
+                      )}
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-center text-sm text-muted-foreground">
+                        <Calendar className="w-4 h-4 mr-2" />
+                        Created {new Date(project.createdAt).toLocaleDateString()}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Quick Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Projects</CardTitle>
+              <Upload className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{projects.length}</div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Images Analyzed</CardTitle>
+              <Eye className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{recentImages.length}</div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Feedback Items</CardTitle>
+              <Plus className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">0</div>
+            </CardContent>
+          </Card>
         </div>
       </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
     </div>
   );
 }

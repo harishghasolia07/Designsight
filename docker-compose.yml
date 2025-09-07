@@ -1,0 +1,33 @@
+version: "3.8"
+
+services:
+  web:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./uploads:/data/uploads
+      - ./tmp:/tmp
+    environment:
+      - NODE_ENV=production
+      - MONGODB_URI=mongodb://mongo:27017/designsight
+      - UPLOAD_DIR=/data/uploads
+      - PDF_TMP_DIR=/tmp
+    env_file:
+      - .env
+    depends_on:
+      - mongo
+    restart: unless-stopped
+
+  mongo:
+    image: mongo:5
+    restart: always
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    environment:
+      - MONGO_INITDB_DATABASE=designsight
+
+volumes:
+  mongo-data:
