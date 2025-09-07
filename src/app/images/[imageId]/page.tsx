@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import Comments from '@/components/Comments';
 import {
     ArrowLeft,
     MessageSquare,
@@ -46,13 +47,17 @@ interface ImageData {
 interface Comment {
     _id: string;
     feedbackId: string;
+    parentId?: string;
     authorId: string;
     body: string;
     createdAt: string;
+    editedAt?: string;
     author?: {
         name: string;
+        email: string;
         role: string;
     };
+    replies?: Comment[];
 }
 
 const ROLE_OPTIONS = [
@@ -156,6 +161,13 @@ export default function ImageViewerPage() {
     const handleFeedbackClick = (item: FeedbackItem) => {
         setSelectedFeedback(item);
         fetchComments(item._id);
+    };
+
+    const handleCommentAdded = (newComment: Comment) => {
+        // Re-fetch all comments to ensure proper threading
+        if (selectedFeedback) {
+            fetchComments(selectedFeedback._id);
+        }
     };
 
     const convertToPixelCoordinates = (bbox: FeedbackItem['bbox']) => {
@@ -375,7 +387,7 @@ export default function ImageViewerPage() {
 
                     {/* Selected Feedback Details */}
                     {selectedFeedback && (
-                        <div className="border-t bg-background">
+                        <div className="border-t bg-background max-h-96 overflow-auto">
                             <div className="p-4">
                                 <div className="flex items-center justify-between mb-4">
                                     <h3 className="font-semibold">Feedback Details</h3>
@@ -388,7 +400,7 @@ export default function ImageViewerPage() {
                                     </Button>
                                 </div>
 
-                                <div className="space-y-3">
+                                <div className="space-y-4">
                                     <div>
                                         <h4 className="text-sm font-medium mb-1">Recommendations:</h4>
                                         <ul className="text-sm space-y-1">
@@ -402,24 +414,11 @@ export default function ImageViewerPage() {
                                     </div>
 
                                     <div>
-                                        <h4 className="text-sm font-medium mb-2 flex items-center">
-                                            <MessageSquare className="w-4 h-4 mr-2" />
-                                            Comments ({comments.length})
-                                        </h4>
-                                        <div className="space-y-2 max-h-32 overflow-auto">
-                                            {comments.length === 0 ? (
-                                                <p className="text-sm text-muted-foreground">No comments yet</p>
-                                            ) : (
-                                                comments.map(comment => (
-                                                    <div key={comment._id} className="text-sm border rounded p-2">
-                                                        <p className="mb-1">{comment.body}</p>
-                                                        <p className="text-xs text-muted-foreground">
-                                                            {comment.author?.name || 'Anonymous'} • {new Date(comment.createdAt).toLocaleDateString()}
-                                                        </p>
-                                                    </div>
-                                                ))
-                                            )}
-                                        </div>
+                                        <Comments
+                                            feedbackId={selectedFeedback._id}
+                                            comments={comments}
+                                            onCommentAdded={handleCommentAdded}
+                                        />
                                     </div>
                                 </div>
                             </div>

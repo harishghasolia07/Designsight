@@ -30,7 +30,6 @@ export async function GET(
         // Get all comments for this feedback item
         const comments = await Comment.find({ feedbackId })
             .populate('authorId', 'name email role')
-            .populate('parentId')
             .sort({ createdAt: 1 }) // Oldest first for threading
             .lean();
 

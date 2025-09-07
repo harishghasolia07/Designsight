@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
-import { MessageSquare, Reply, Send, User } from 'lucide-react';
+import { MessageSquare, Reply, Send, User, ChevronDown, ChevronRight } from 'lucide-react';
 
 interface Comment {
     _id: string;
@@ -33,6 +33,7 @@ export default function Comments({ feedbackId, comments, onCommentAdded }: Comme
     const [replyTo, setReplyTo] = useState<string | null>(null);
     const [replyText, setReplyText] = useState('');
     const [submitting, setSubmitting] = useState(false);
+    const [expandedReplies, setExpandedReplies] = useState<Set<string>>(new Set());
 
     const submitComment = async (body: string, parentId?: string) => {
         if (!body.trim()) return;
@@ -95,6 +96,18 @@ export default function Comments({ feedbackId, comments, onCommentAdded }: Comme
         }
     };
 
+    const toggleReplies = (commentId: string) => {
+        setExpandedReplies(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(commentId)) {
+                newSet.delete(commentId);
+            } else {
+                newSet.add(commentId);
+            }
+            return newSet;
+        });
+    };
+
     const renderComment = (comment: Comment, isReply = false) => (
         <div key={comment._id} className={`${isReply ? 'ml-8 mt-2' : 'mb-4'}`}>
             <Card className="bg-muted/50">
@@ -103,7 +116,7 @@ export default function Comments({ feedbackId, comments, onCommentAdded }: Comme
                         <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-sm font-semibold">
                             <User className="w-4 h-4" />
                         </div>
-                        <div className="flex-1">
+                        <div className="flex-1 min-w-0">
                             <div className="flex items-center space-x-2 mb-2">
                                 <span className="font-medium text-sm">
                                     {comment.author?.name || 'Anonymous'}
@@ -123,17 +136,34 @@ export default function Comments({ feedbackId, comments, onCommentAdded }: Comme
                                     </span>
                                 )}
                             </div>
-                            <p className="text-sm mb-2">{comment.body}</p>
+                            <p className="text-sm mb-2 break-words overflow-wrap-anywhere word-break-break-all">{comment.body}</p>
                             {!isReply && (
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => setReplyTo(replyTo === comment._id ? null : comment._id)}
-                                    className="text-xs h-6 px-2"
-                                >
-                                    <Reply className="w-3 h-3 mr-1" />
-                                    Reply
-                                </Button>
+                                <div className="flex items-center space-x-2">
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => setReplyTo(replyTo === comment._id ? null : comment._id)}
+                                        className="text-xs h-6 px-2"
+                                    >
+                                        <Reply className="w-3 h-3 mr-1" />
+                                        Reply
+                                    </Button>
+                                    {comment.replies && comment.replies.length > 0 && (
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => toggleReplies(comment._id)}
+                                            className="text-xs h-6 px-2 text-muted-foreground"
+                                        >
+                                            {expandedReplies.has(comment._id) ? (
+                                                <ChevronDown className="w-3 h-3 mr-1" />
+                                            ) : (
+                                                <ChevronRight className="w-3 h-3 mr-1" />
+                                            )}
+                                            {comment.replies.length} {comment.replies.length === 1 ? 'reply' : 'replies'}
+                                        </Button>
+                                    )}
+                                </div>
                             )}
                         </div>
                     </div>
@@ -165,12 +195,16 @@ export default function Comments({ feedbackId, comments, onCommentAdded }: Comme
                 </CardContent>
             </Card>
 
-            {/* Render replies */}
-            {comment.replies && comment.replies.map(reply => (
-                <div key={reply._id}>
-                    {renderComment(reply, true)}
+            {/* Render replies - only if expanded */}
+            {comment.replies && comment.replies.length > 0 && expandedReplies.has(comment._id) && (
+                <div className="mt-2">
+                    {comment.replies.map(reply => (
+                        <div key={reply._id}>
+                            {renderComment(reply, true)}
+                        </div>
+                    ))}
                 </div>
-            ))}
+            )}
         </div>
     );
 
@@ -178,11 +212,28 @@ export default function Comments({ feedbackId, comments, onCommentAdded }: Comme
     const topLevelComments = comments.filter(comment => !comment.parentId);
     const commentReplies = comments.filter(comment => comment.parentId);
 
-    // Attach replies to their parent comments
-    const threaded = topLevelComments.map(comment => ({
-        ...comment,
-        replies: commentReplies.filter(reply => reply.parentId === comment._id)
-    }));
+    // Attach replies to their parent comments with robust ID comparison
+    const threaded = topLevelComments.map(comment => {
+        const commentId = comment._id.toString();
+        const replies = commentReplies.filter(reply => {
+            if (!reply.parentId) return false;
+
+            // Handle both ObjectId and populated object cases
+            let parentId: string;
+            if (typeof reply.parentId === 'object' && reply.parentId !== null && '_id' in reply.parentId) {
+                parentId = (reply.parentId as any)._id.toString();
+            } else {
+                parentId = reply.parentId.toString();
+            }
+
+            return parentId === commentId;
+        });
+
+        return {
+            ...comment,
+            replies
+        };
+    });
 
     return (
         <div className="space-y-4">

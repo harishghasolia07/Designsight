@@ -37,6 +37,14 @@ Focus on:
 - Content issues (unclear copy, missing information)
 - UI pattern violations (inconsistent components, poor layouts)
 
+IMPORTANT: Assign roles specifically based on relevance:
+- "designer": Visual design, layout, typography, color, spacing
+- "developer": Technical implementation, code-related fixes, accessibility compliance
+- "pm": User experience, business logic, feature clarity
+- "reviewer": Quality assurance, usability, best practices
+
+Do NOT assign all roles to every item. Each feedback should have 1-3 most relevant roles only.
+
 Provide 3-8 actionable feedback items with accurate bounding boxes.`;
 
 export async function analyzeImageWithGemini(

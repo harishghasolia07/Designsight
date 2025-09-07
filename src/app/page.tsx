@@ -27,6 +27,7 @@ interface Image {
 export default function Dashboard() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [recentImages, setRecentImages] = useState<Image[]>([]);
+  const [totalFeedbackItems, setTotalFeedbackItems] = useState(0);
   const [loading, setLoading] = useState(true);
   const [showCreateProject, setShowCreateProject] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
@@ -34,7 +35,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchProjects();
-    fetchRecentImages();
+    fetchDashboardStats();
   }, []);
 
   const fetchProjects = async () => {
@@ -56,6 +57,21 @@ export default function Dashboard() {
       setRecentImages([]);
     } catch (error) {
       console.error('Failed to fetch recent images:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchDashboardStats = async () => {
+    try {
+      const response = await fetch('/api/dashboard/stats');
+      const data = await response.json();
+      if (data.success) {
+        setRecentImages(data.data.images || []);
+        setTotalFeedbackItems(data.data.totalFeedbackItems || 0);
+      }
+    } catch (error) {
+      console.error('Failed to fetch dashboard stats:', error);
     } finally {
       setLoading(false);
     }
@@ -234,7 +250,7 @@ export default function Dashboard() {
               <Plus className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">0</div>
+              <div className="text-2xl font-bold">{totalFeedbackItems}</div>
             </CardContent>
           </Card>
         </div>
