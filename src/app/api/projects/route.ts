@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@clerk/nextjs/server';
 import dbConnect from '@/lib/mongodb';
 import { Project, IProject } from '@/models';
 import { z } from 'zod';
@@ -11,13 +12,18 @@ const createProjectSchema = z.object({
 
 export async function GET(request: NextRequest) {
     try {
+        const { userId } = await auth();
+        if (!userId) {
+            return NextResponse.json(
+                { success: false, error: 'Unauthorized' },
+                { status: 401 }
+            );
+        }
+
         await dbConnect();
 
-        const { searchParams } = new URL(request.url);
-        const ownerId = searchParams.get('ownerId');
-
-        const query = ownerId ? { ownerId } : {};
-        const projects = await Project.find(query)
+        // Only fetch projects owned by the authenticated user
+        const projects = await Project.find({ ownerId: userId })
             .sort({ createdAt: -1 })
             .lean();
 
@@ -36,6 +42,14 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
     try {
+        const { userId } = await auth();
+        if (!userId) {
+            return NextResponse.json(
+                { success: false, error: 'Unauthorized' },
+                { status: 401 }
+            );
+        }
+
         await dbConnect();
 
         const body = await request.json();
@@ -44,7 +58,7 @@ export async function POST(request: NextRequest) {
         const project = new Project({
             name: validatedData.name,
             description: validatedData.description,
-            ownerId: validatedData.ownerId,
+            ownerId: userId, // Use the authenticated user's ID
             createdAt: new Date()
         });
 

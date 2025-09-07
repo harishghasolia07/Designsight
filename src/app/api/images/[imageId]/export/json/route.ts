@@ -65,6 +65,7 @@ export async function GET(
                 description: item.text,
                 recommendations: item.recommendations,
                 aiProvider: item.aiProvider,
+                aiModelVersion: item.aiModelVersion,  // Include AI model version
                 createdAt: item.createdAt,
                 comments: item.comments
             })),

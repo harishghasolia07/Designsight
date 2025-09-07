@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { useUser } from '@clerk/nextjs';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -82,9 +83,27 @@ const SEVERITY_COLORS = {
 };
 
 export default function ImageViewerPage() {
+    const { isLoaded, isSignedIn } = useUser();
     const params = useParams();
     const router = useRouter();
     const imageId = params.imageId as string;
+
+    // Redirect if not authenticated
+    if (!isLoaded) {
+        return (
+            <div className="min-h-screen bg-background flex items-center justify-center">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                    <p className="text-muted-foreground">Loading...</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (!isSignedIn) {
+        router.push('/sign-in');
+        return null;
+    }
 
     const [imageData, setImageData] = useState<ImageData | null>(null);
     const [feedback, setFeedback] = useState<FeedbackItem[]>([]);

@@ -64,6 +64,7 @@ export interface IFeedbackItem extends Document {
     text: string;
     recommendations: string[];
     aiProvider: 'gemini';
+    aiModelVersion?: string;  // Added to track specific AI model version
     createdAt: Date;
     createdBy?: mongoose.Types.ObjectId;
 }
@@ -103,6 +104,9 @@ const FeedbackItemSchema = new Schema<IFeedbackItem>({
         enum: ['gemini'],
         default: 'gemini'
     },
+    aiModelVersion: {
+        type: String
+    },
     createdAt: { type: Date, default: Date.now },
     createdBy: { type: Schema.Types.ObjectId, ref: 'User' }
 });
@@ -127,26 +131,28 @@ const CommentSchema = new Schema<IComment>({
     editedAt: { type: Date }
 });
 
-// User Model
+// User Model (for Clerk integration)
 export interface IUser extends Document {
     _id: mongoose.Types.ObjectId;
+    clerkId: string; // Clerk user ID
     name: string;
     email: string;
-    role: 'designer' | 'reviewer' | 'pm' | 'developer';
-    password?: string;
+    role?: 'designer' | 'reviewer' | 'pm' | 'developer';
     createdAt: Date;
+    updatedAt: Date;
 }
 
 const UserSchema = new Schema<IUser>({
+    clerkId: { type: String, required: true, unique: true },
     name: { type: String, required: true },
-    email: { type: String, required: true, unique: true },
+    email: { type: String, required: true },
     role: {
         type: String,
         enum: ['designer', 'reviewer', 'pm', 'developer'],
-        required: true
+        default: 'designer'
     },
-    password: { type: String },
-    createdAt: { type: Date, default: Date.now }
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now }
 });
 
 // Export models

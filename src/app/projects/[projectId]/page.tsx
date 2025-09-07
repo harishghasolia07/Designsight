@@ -1,7 +1,9 @@
 'use client';
+'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { useUser } from '@clerk/nextjs';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
@@ -39,9 +41,27 @@ interface ImageItem {
 }
 
 export default function ProjectDetailPage() {
+    const { isLoaded, isSignedIn } = useUser();
     const params = useParams();
     const router = useRouter();
     const projectId = params.projectId as string;
+
+    // Redirect if not authenticated
+    if (!isLoaded) {
+        return (
+            <div className="min-h-screen bg-background flex items-center justify-center">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                    <p className="text-muted-foreground">Loading...</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (!isSignedIn) {
+        router.push('/sign-in');
+        return null;
+    }
 
     const [project, setProject] = useState<Project | null>(null);
     const [images, setImages] = useState<ImageItem[]>([]);
@@ -360,12 +380,12 @@ export default function ProjectDetailPage() {
                                 <label htmlFor="file-upload" className="cursor-pointer">
                                     {uploading ? (
                                         <>
-                                            <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                                            <RefreshCw className="w-20 h-4 mr-2 animate-spin" />
                                             Uploading...
                                         </>
                                     ) : (
                                         <>
-                                            <Upload className="w-4 h-4 mr-2" />
+                                            <Upload className="w-20 h-4 mr-2" />
                                             Choose Files
                                         </>
                                     )}

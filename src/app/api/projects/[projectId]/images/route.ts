@@ -118,6 +118,7 @@ async function analyzeImageInBackground(
                     text: item.text,
                     recommendations: item.recommendations,
                     aiProvider: 'gemini',
+                    aiModelVersion: item.modelVersion || process.env.GEMINI_MODEL || 'gemini-1.5-pro',
                     createdAt: new Date()
                 });
                 return feedback.save();
@@ -129,9 +130,6 @@ async function analyzeImageInBackground(
             status: 'done',
             analysisId: savedFeedback[0]?._id // Reference to first feedback item
         });
-
-        console.log(`Analysis completed for image ${imageId}, generated ${savedFeedback.length} feedback items`);
-
     } catch (error) {
         console.error('Background analysis error:', error);
         throw error;

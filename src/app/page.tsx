@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useUser, UserButton } from '@clerk/nextjs';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -25,6 +26,7 @@ interface Image {
 }
 
 export default function Dashboard() {
+  const { isLoaded, isSignedIn, user } = useUser();
   const [projects, setProjects] = useState<Project[]>([]);
   const [recentImages, setRecentImages] = useState<Image[]>([]);
   const [totalFeedbackItems, setTotalFeedbackItems] = useState(0);
@@ -33,10 +35,49 @@ export default function Dashboard() {
   const [newProjectName, setNewProjectName] = useState('');
   const [newProjectDescription, setNewProjectDescription] = useState('');
 
+  // useEffect must be called before any early returns to maintain hook order
   useEffect(() => {
-    fetchProjects();
-    fetchDashboardStats();
-  }, []);
+    if (isLoaded && isSignedIn) {
+      fetchProjects();
+      fetchDashboardStats();
+    }
+  }, [isLoaded, isSignedIn]);
+
+  // Show loading spinner while Clerk is initializing
+  if (!isLoaded) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Redirect to sign-in if not authenticated
+  if (!isSignedIn) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <CardTitle className="text-2xl">Welcome to DesignSight</CardTitle>
+            <CardDescription>
+              AI-powered design feedback and collaboration platform
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="text-center">
+            <p className="text-muted-foreground mb-4">
+              Please sign in to access your projects and get AI-powered design feedback.
+            </p>
+            <Button asChild className="w-full">
+              <Link href="/sign-in">Sign In</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   const fetchProjects = async () => {
     try {
@@ -90,7 +131,7 @@ export default function Dashboard() {
         body: JSON.stringify({
           name: newProjectName,
           description: newProjectDescription,
-          ownerId: '60f1b0b3e6b3a12f8c123456' // Mock user ID for MVP
+          ownerId: user?.id || 'anonymous' // Use Clerk user ID
         }),
       });
 
@@ -129,10 +170,13 @@ export default function Dashboard() {
                 AI-powered design feedback and collaboration
               </p>
             </div>
-            <Button onClick={() => setShowCreateProject(true)}>
-              <Plus className="w-4 h-4 mr-2" />
-              New Project
-            </Button>
+            <div className="flex items-center gap-4">
+              <Button onClick={() => setShowCreateProject(true)}>
+                <Plus className="w-4 h-4 mr-2" />
+                New Project
+              </Button>
+              <UserButton afterSignOutUrl="/" />
+            </div>
           </div>
         </div>
       </header>
