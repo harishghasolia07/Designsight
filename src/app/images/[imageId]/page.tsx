@@ -83,12 +83,43 @@ const SEVERITY_COLORS = {
 };
 
 export default function ImageViewerPage() {
-    const { isLoaded, isSignedIn } = useUser();
+    const { isLoaded, isSignedIn, user } = useUser();
     const params = useParams();
     const router = useRouter();
     const imageId = params.imageId as string;
 
-    // Redirect if not authenticated
+    // All hooks must be declared at the top level
+    const [imageData, setImageData] = useState<ImageData | null>(null);
+    const [feedback, setFeedback] = useState<FeedbackItem[]>([]);
+    const [filteredFeedback, setFilteredFeedback] = useState<FeedbackItem[]>([]);
+    const [selectedRole, setSelectedRole] = useState('all');
+    const [selectedFeedback, setSelectedFeedback] = useState<FeedbackItem | null>(null);
+    const [comments, setComments] = useState<Comment[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [imageLoaded, setImageLoaded] = useState(false);
+    const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
+
+    const imageRef = useRef<HTMLImageElement>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    // All useEffect and useCallback hooks
+    useEffect(() => {
+        if (imageId) {
+            fetchImageData();
+        }
+    }, [imageId]);
+
+    useEffect(() => {
+        if (selectedRole === 'all') {
+            setFilteredFeedback(feedback);
+        } else {
+            setFilteredFeedback(feedback.filter(item =>
+                item.roles.includes(selectedRole as 'designer' | 'reviewer' | 'pm' | 'developer')
+            ));
+        }
+    }, [feedback, selectedRole]);
+
+    // Early returns after all hooks are declared
     if (!isLoaded) {
         return (
             <div className="min-h-screen bg-background flex items-center justify-center">
@@ -104,33 +135,6 @@ export default function ImageViewerPage() {
         router.push('/sign-in');
         return null;
     }
-
-    const [imageData, setImageData] = useState<ImageData | null>(null);
-    const [feedback, setFeedback] = useState<FeedbackItem[]>([]);
-    const [filteredFeedback, setFilteredFeedback] = useState<FeedbackItem[]>([]);
-    const [selectedRole, setSelectedRole] = useState('all');
-    const [selectedFeedback, setSelectedFeedback] = useState<FeedbackItem | null>(null);
-    const [comments, setComments] = useState<Comment[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [imageLoaded, setImageLoaded] = useState(false);
-    const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
-
-    const imageRef = useRef<HTMLImageElement>(null);
-    const containerRef = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-        if (imageId) {
-            fetchImageData();
-        }
-    }, [imageId]);
-
-    useEffect(() => {
-        if (selectedRole === 'all') {
-            setFilteredFeedback(feedback);
-        } else {
-            setFilteredFeedback(feedback.filter(item => item.roles.includes(selectedRole)));
-        }
-    }, [feedback, selectedRole]);
 
     const fetchImageData = async () => {
         try {

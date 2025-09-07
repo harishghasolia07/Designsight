@@ -1,7 +1,6 @@
 'use client';
-'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useUser } from '@clerk/nextjs';
 import Link from 'next/link';
@@ -17,8 +16,7 @@ import {
     RefreshCw,
     AlertCircle,
     CheckCircle,
-    Clock,
-    X
+    Clock
 } from 'lucide-react';
 
 interface Project {
@@ -46,48 +44,15 @@ export default function ProjectDetailPage() {
     const router = useRouter();
     const projectId = params.projectId as string;
 
-    // Redirect if not authenticated
-    if (!isLoaded) {
-        return (
-            <div className="min-h-screen bg-background flex items-center justify-center">
-                <div className="text-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-                    <p className="text-muted-foreground">Loading...</p>
-                </div>
-            </div>
-        );
-    }
-
-    if (!isSignedIn) {
-        router.push('/sign-in');
-        return null;
-    }
-
+    // All hooks must be declared at the top level
     const [project, setProject] = useState<Project | null>(null);
     const [images, setImages] = useState<ImageItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [uploading, setUploading] = useState(false);
     const [dragActive, setDragActive] = useState(false);
-    const pollingIntervalsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
+    const pollingIntervalsRef = useRef<Map<string, ReturnType<typeof setInterval>>>(new Map());
 
-    useEffect(() => {
-        if (projectId) {
-            fetchProjectDetails();
-            fetchProjectImages();
-        }
-    }, [projectId]);
-
-    // Cleanup effect for polling intervals
-    useEffect(() => {
-        return () => {
-            pollingIntervalsRef.current.forEach(intervalId => {
-                clearInterval(intervalId);
-            });
-            pollingIntervalsRef.current.clear();
-        };
-    }, []);
-
-    const fetchProjectDetails = async () => {
+    const fetchProjectDetails = useCallback(async () => {
         try {
             const response = await fetch(`/api/projects`);
             const data = await response.json();
@@ -103,7 +68,7 @@ export default function ProjectDetailPage() {
             console.error('Failed to fetch project:', error);
             router.push('/');
         }
-    };
+    }, [projectId, router]);
 
     const startPollingForImage = useCallback((imageId: string) => {
         // Prevent duplicate polling
@@ -130,8 +95,8 @@ export default function ProjectDetailPage() {
                         return;
                     } else if (updatedImage && updatedImage.status === 'processing') {
                         // Only update state if we have actual changes to avoid unnecessary re-renders
-                        setImages(prevImages => {
-                            const hasChanges = prevImages.some(img =>
+                        setImages((prevImages: ImageItem[]) => {
+                            const hasChanges = prevImages.some((img: ImageItem) =>
                                 img._id === imageId && img.status !== updatedImage.status
                             );
                             return hasChanges ? data.data : prevImages;
@@ -182,7 +147,7 @@ export default function ProjectDetailPage() {
         }
     }, [projectId, startPollingForImage]);
 
-    const handleFileUpload = async (files: FileList) => {
+    const handleFileUpload = useCallback(async (files: FileList) => {
         if (!files.length) return;
 
         setUploading(true);
@@ -204,7 +169,7 @@ export default function ProjectDetailPage() {
 
                 const data = await response.json();
                 if (data.success) {
-                    setImages(prev => [data.data, ...prev]);
+                    setImages((prev: ImageItem[]) => [data.data, ...prev]);
                     // Start polling only for newly uploaded processing images
                     if (data.data.status === 'processing') {
                         startPollingForImage(data.data._id);
@@ -219,7 +184,7 @@ export default function ProjectDetailPage() {
         }
 
         setUploading(false);
-    };
+    }, [projectId, startPollingForImage]);
 
     const handleDrag = useCallback((e: React.DragEvent) => {
         e.preventDefault();
@@ -239,7 +204,42 @@ export default function ProjectDetailPage() {
         if (e.dataTransfer.files && e.dataTransfer.files[0]) {
             handleFileUpload(e.dataTransfer.files);
         }
-    }, [projectId]);
+    }, [handleFileUpload]);
+
+    useEffect(() => {
+        if (projectId) {
+            fetchProjectDetails();
+            fetchProjectImages();
+        }
+    }, [projectId, fetchProjectDetails, fetchProjectImages]);
+
+    // Cleanup effect for polling intervals
+    useEffect(() => {
+        const intervals = pollingIntervalsRef.current;
+        return () => {
+            intervals.forEach((intervalId: ReturnType<typeof setInterval>) => {
+                clearInterval(intervalId);
+            });
+            intervals.clear();
+        };
+    }, []);
+
+    // Early returns after all hooks are declared
+    if (!isLoaded) {
+        return (
+            <div className="min-h-screen bg-background flex items-center justify-center">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                    <p className="text-muted-foreground">Loading...</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (!isSignedIn) {
+        router.push('/sign-in');
+        return null;
+    }
 
     const getStatusIcon = (status: string) => {
         switch (status) {
@@ -286,7 +286,7 @@ export default function ProjectDetailPage() {
                         <AlertCircle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                         <h3 className="text-lg font-semibold mb-2">Project not found</h3>
                         <p className="text-muted-foreground mb-4">
-                            The project you're looking for doesn't exist or you don't have access to it.
+                            The project you&apos;re looking for doesn&apos;t exist or you don&apos;t have access to it.
                         </p>
                         <Button onClick={() => router.push('/')}>
                             <ArrowLeft className="w-4 h-4 mr-2" />
