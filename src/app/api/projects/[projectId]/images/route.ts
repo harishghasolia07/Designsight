@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongodb';
 import { Project, Image, FeedbackItem } from '@/models';
 import { saveUploadedFile } from '@/lib/upload';
-import { retryAnalysis } from '@/lib/gemini';
+import { analyzeImageWithRateLimit } from '@/lib/gemini';
 import { readFile } from 'fs/promises';
 import { join } from 'path';
 
@@ -102,7 +102,7 @@ async function analyzeImageInBackground(
         const imageBuffer = await readFile(filePath);
 
         // Analyze with Gemini
-        const feedbackItems = await retryAnalysis(imageBuffer, mimeType);
+        const feedbackItems = await analyzeImageWithRateLimit(imageBuffer, mimeType);
 
         // Save feedback items to database
         const savedFeedback = await Promise.all(
@@ -118,7 +118,7 @@ async function analyzeImageInBackground(
                     text: item.text,
                     recommendations: item.recommendations,
                     aiProvider: 'gemini',
-                    aiModelVersion: item.modelVersion || process.env.GEMINI_MODEL || 'gemini-1.5-pro',
+                    aiModelVersion: item.modelVersion || process.env.GEMINI_MODEL || 'gemini-1.5-flash',
                     createdAt: new Date()
                 });
                 return feedback.save();

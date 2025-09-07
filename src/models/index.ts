@@ -5,14 +5,14 @@ export interface IProject extends Document {
     _id: mongoose.Types.ObjectId;
     name: string;
     description?: string;
-    ownerId: mongoose.Types.ObjectId;
+    ownerId: string; // Clerk user ID
     createdAt: Date;
 }
 
 const ProjectSchema = new Schema<IProject>({
     name: { type: String, required: true },
     description: { type: String },
-    ownerId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    ownerId: { type: String, required: true }, // Store Clerk user ID directly
     createdAt: { type: Date, default: Date.now }
 });
 
@@ -155,7 +155,7 @@ const UserSchema = new Schema<IUser>({
     updatedAt: { type: Date, default: Date.now }
 });
 
-// Export models
+// Export models - Handle Next.js hot reloading properly
 export const Project = mongoose.models.Project || mongoose.model<IProject>('Project', ProjectSchema);
 export const Image = mongoose.models.Image || mongoose.model<IImage>('Image', ImageSchema);
 export const FeedbackItem = mongoose.models.FeedbackItem || mongoose.model<IFeedbackItem>('FeedbackItem', FeedbackItemSchema);

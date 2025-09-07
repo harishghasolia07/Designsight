@@ -80,9 +80,13 @@ export async function analyzeImageWithGemini(
     mimeType: string
 ): Promise<GeminiFeedbackResponse[]> {
     try {
-        const modelVersion = process.env.GEMINI_MODEL || 'gemini-1.5-pro';
+        const modelVersion = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
         const model = genAI.getGenerativeModel({
-            model: modelVersion
+            model: modelVersion,
+            generationConfig: {
+                temperature: 0.1, // Lower temperature for more consistent responses
+                maxOutputTokens: 4096, // Limit output to reduce quota usage
+            },
         });
 
         const imagePart = {
@@ -92,6 +96,7 @@ export async function analyzeImageWithGemini(
             }
         };
 
+        console.log(`Starting Gemini analysis with model: ${modelVersion}`);
         const result = await model.generateContent([FEEDBACK_PROMPT, imagePart]);
         const response = await result.response;
         const text = response.text();
@@ -120,10 +125,23 @@ export async function analyzeImageWithGemini(
             item.modelVersion = modelVersion;
         });
 
+        console.log(`Gemini analysis completed successfully with ${feedbackItems.length} feedback items`);
         return feedbackItems;
     } catch (error) {
         console.error('Gemini API Error:', error);
-        throw new Error(`Failed to analyze image: ${error instanceof Error ? error.message : 'Unknown error'}`);
+
+        // Provide more specific error messages for common issues
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+        if (errorMessage.includes('429') || errorMessage.includes('quota')) {
+            throw new Error(`Gemini API rate limit exceeded. ${errorMessage}`);
+        } else if (errorMessage.includes('API key')) {
+            throw new Error(`Gemini API key issue. Please check your API key configuration.`);
+        } else if (errorMessage.includes('SAFETY')) {
+            throw new Error(`Image content flagged by safety filters. Please try a different image.`);
+        }
+
+        throw new Error(`Failed to analyze image: ${errorMessage}`);
     }
 }
 
@@ -151,34 +169,36 @@ function improveBoundingBox(bbox: { x: number; y: number; width: number; height:
     };
 }
 
-function validateFeedbackItem(item: any): item is GeminiFeedbackResponse {
+function validateFeedbackItem(item: unknown): item is GeminiFeedbackResponse {
     const requiredFields = ['category', 'severity', 'roles', 'bbox', 'anchorType', 'title', 'text', 'recommendations'];
 
     for (const field of requiredFields) {
-        if (!(field in item)) {
+        if (!(field in (item as Record<string, unknown>))) {
             return false;
         }
     }
 
+    const feedbackItem = item as Record<string, unknown>;
+
     // Validate category
-    if (!['accessibility', 'visual_hierarchy', 'content', 'ui_pattern'].includes(item.category)) {
+    if (!['accessibility', 'visual_hierarchy', 'content', 'ui_pattern'].includes(feedbackItem.category as string)) {
         return false;
     }
 
     // Validate severity
-    if (!['high', 'medium', 'low'].includes(item.severity)) {
+    if (!['high', 'medium', 'low'].includes(feedbackItem.severity as string)) {
         return false;
     }
 
     // Validate roles
-    if (!Array.isArray(item.roles) || !item.roles.every((role: string) =>
+    if (!Array.isArray(feedbackItem.roles) || !(feedbackItem.roles as string[]).every((role: string) =>
         ['designer', 'reviewer', 'pm', 'developer'].includes(role)
     )) {
         return false;
     }
 
     // Validate bbox coordinates (should be between 0 and 1)
-    const { bbox } = item;
+    const bbox = feedbackItem.bbox as Record<string, unknown>;
     if (typeof bbox !== 'object' ||
         typeof bbox.x !== 'number' || bbox.x < 0 || bbox.x > 1 ||
         typeof bbox.y !== 'number' || bbox.y < 0 || bbox.y > 1 ||
@@ -188,17 +208,17 @@ function validateFeedbackItem(item: any): item is GeminiFeedbackResponse {
     }
 
     // Validate anchorType
-    if (!['bbox', 'point'].includes(item.anchorType)) {
+    if (!['bbox', 'point'].includes(feedbackItem.anchorType as string)) {
         return false;
     }
 
     // Validate strings
-    if (typeof item.title !== 'string' || typeof item.text !== 'string') {
+    if (typeof feedbackItem.title !== 'string' || typeof feedbackItem.text !== 'string') {
         return false;
     }
 
     // Validate recommendations
-    if (!Array.isArray(item.recommendations) || !item.recommendations.every((rec: any) => typeof rec === 'string')) {
+    if (!Array.isArray(feedbackItem.recommendations) || !(feedbackItem.recommendations as string[]).every((rec: string) => typeof rec === 'string')) {
         return false;
     }
 
@@ -219,12 +239,84 @@ export async function retryAnalysis(
             lastError = error as Error;
             console.warn(`Analysis attempt ${attempt} failed:`, error);
 
-            if (attempt < maxRetries) {
-                // Wait before retrying
+            // Check if it's a rate limit error
+            const errorMessage = error instanceof Error ? error.message : '';
+            const isRateLimit = errorMessage.includes('429') ||
+                errorMessage.includes('quota') ||
+                errorMessage.includes('rate limit');
+
+            if (isRateLimit && attempt < maxRetries) {
+                // For rate limit errors, wait longer with exponential backoff
+                const delay = Math.min(60000, 1000 * Math.pow(2, attempt)); // Max 60 seconds
+                console.log(`Rate limit hit. Waiting ${delay / 1000}s before retry ${attempt + 1}...`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+            } else if (attempt < maxRetries) {
+                // For other errors, shorter wait
                 await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+            } else {
+                // If it's the last attempt and rate limit, provide helpful error
+                if (isRateLimit) {
+                    throw new Error(
+                        'Gemini API rate limit exceeded. Please wait a few minutes before uploading more images, ' +
+                        'or consider upgrading your API plan for higher limits. ' +
+                        'Free tier limits: 15 requests per minute, 1,500 requests per day.'
+                    );
+                }
             }
         }
     }
 
     throw lastError!;
+}
+
+// Add a simple rate limiter to prevent too many concurrent requests
+class RateLimiter {
+    private queue: Array<() => void> = [];
+    private running = 0;
+    private maxConcurrent = 2; // Limit concurrent requests
+    private minInterval = 2000; // 2 seconds between requests
+    private lastRequestTime = 0;
+
+    async execute<T>(fn: () => Promise<T>): Promise<T> {
+        return new Promise((resolve, reject) => {
+            this.queue.push(async () => {
+                try {
+                    // Ensure minimum interval between requests
+                    const now = Date.now();
+                    const timeSinceLastRequest = now - this.lastRequestTime;
+                    if (timeSinceLastRequest < this.minInterval) {
+                        await new Promise(r => setTimeout(r, this.minInterval - timeSinceLastRequest));
+                    }
+
+                    this.lastRequestTime = Date.now();
+                    const result = await fn();
+                    resolve(result);
+                } catch (error) {
+                    reject(error);
+                } finally {
+                    this.running--;
+                    this.processQueue();
+                }
+            });
+            this.processQueue();
+        });
+    }
+
+    private processQueue() {
+        if (this.running < this.maxConcurrent && this.queue.length > 0) {
+            this.running++;
+            const next = this.queue.shift()!;
+            next();
+        }
+    }
+}
+
+const rateLimiter = new RateLimiter();
+
+// Wrap the analysis function with rate limiting
+export async function analyzeImageWithRateLimit(
+    imageBuffer: Buffer,
+    mimeType: string
+): Promise<GeminiFeedbackResponse[]> {
+    return rateLimiter.execute(() => retryAnalysis(imageBuffer, mimeType));
 }
