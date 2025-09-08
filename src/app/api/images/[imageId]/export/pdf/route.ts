@@ -1,130 +1,148 @@
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongodb';
 import { Image, FeedbackItem, Comment, IImage, IFeedbackItem } from '@/models';
-import puppeteer from 'puppeteer';
-import { join } from 'path';
+import puppeteer, { Browser } from 'puppeteer-core';
+import chromium from '@sparticuz/chromium';
+import { existsSync } from 'fs';
+import { execSync } from 'child_process';
 
 export async function GET(
-    request: NextRequest,
-    { params }: { params: Promise<{ imageId: string }> }
+  request: NextRequest,
+  { params }: { params: Promise<{ imageId: string }> }
 ) {
-    let browser: any = null;
+  let browser: Browser | null = null;
 
-    try {
-        await dbConnect();
+  try {
+    await dbConnect();
 
-        const { imageId } = await params;
+    const { imageId } = await params;
 
-        // Get image details
-        const image = await Image.findById(imageId).lean() as IImage | null;
-        if (!image) {
-            return NextResponse.json(
-                { success: false, error: 'Image not found' },
-                { status: 404 }
-            );
-        }
-
-        // Get all feedback for this image
-        const feedback = await FeedbackItem.find({ imageId }).lean() as unknown as IFeedbackItem[];
-
-        // Get comments for each feedback item
-        const feedbackWithComments = await Promise.all(
-            feedback.map(async (item) => {
-                const comments = await Comment.find({ feedbackId: item._id })
-                    .populate('authorId', 'name email role')
-                    .lean();
-
-                return {
-                    ...item,
-                    comments: comments.map(comment => ({
-                        id: comment._id,
-                        body: comment.body,
-                        author: comment.authorId,
-                        createdAt: comment.createdAt
-                    }))
-                } as IFeedbackItem & { comments: any[] };
-            })
-        );
-
-        // Launch Puppeteer
-        browser = await puppeteer.launch({
-            headless: true,
-            args: ['--no-sandbox', '--disable-setuid-sandbox']
-        });
-
-        const page = await browser.newPage();
-
-        // Generate HTML content for PDF
-        const htmlContent = generatePDFHTML(image, feedbackWithComments);
-
-        await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
-
-        // Generate PDF
-        const pdfBuffer = await page.pdf({
-            format: 'A4',
-            printBackground: true,
-            margin: {
-                top: '20mm',
-                right: '20mm',
-                bottom: '20mm',
-                left: '20mm'
-            }
-        });
-
-        await browser.close();
-
-        // Set filename for download
-        const filename = `${image.filename.split('.')[0]}_feedback_report_${new Date().toISOString().split('T')[0]}.pdf`;
-
-        return new NextResponse(pdfBuffer, {
-            headers: {
-                'Content-Type': 'application/pdf',
-                'Content-Disposition': `attachment; filename="${filename}"`,
-            },
-        });
-
-    } catch (error) {
-        console.error('PDF export error:', error);
-
-        if (browser) {
-            await browser.close();
-        }
-
-        return NextResponse.json(
-            { success: false, error: 'Failed to generate PDF report' },
-            { status: 500 }
-        );
+    // Get image details
+    const image = await Image.findById(imageId).lean() as IImage | null;
+    if (!image) {
+      return NextResponse.json(
+        { success: false, error: 'Image not found' },
+        { status: 404 }
+      );
     }
+
+    // Get all feedback for this image
+    const feedback = await FeedbackItem.find({ imageId }).lean() as unknown as IFeedbackItem[];
+
+    // Get comments for each feedback item
+    const feedbackWithComments = await Promise.all(
+      feedback.map(async (item) => {
+        const comments = await Comment.find({ feedbackId: item._id })
+          .populate('authorId', 'name email role')
+          .lean();
+
+        return {
+          ...item,
+          comments: comments.map(comment => ({
+            id: comment._id,
+            body: comment.body,
+            author: comment.authorId,
+            createdAt: comment.createdAt
+          }))
+        } as IFeedbackItem & { comments: Array<{ id: string; body: string; author: { name?: string } | null; createdAt: Date }> };
+      })
+    );
+
+    // Launch Puppeteer with serverless Chrome
+    const isLocal = process.env.NODE_ENV === 'development';
+
+    let executablePath: string;
+    if (isLocal) {
+      // Try to find Chrome executable in local environment
+      const puppeteerChrome = '/home/harish/.cache/puppeteer/chrome/linux-131.0.6778.204/chrome-linux64/chrome';
+      if (existsSync(puppeteerChrome)) {
+        executablePath = puppeteerChrome;
+      } else {
+        // Fallback: try to find Chrome in common locations
+        try {
+          executablePath = execSync('which google-chrome-stable || which google-chrome || which chromium-browser || which chromium', { encoding: 'utf8' }).trim();
+        } catch {
+          throw new Error('Chrome not found. Please install Chrome or run: npx puppeteer browsers install chrome');
+        }
+      }
+    } else {
+      executablePath = await chromium.executablePath();
+    }
+
+    browser = await puppeteer.launch({
+      args: isLocal ? ['--no-sandbox', '--disable-setuid-sandbox'] : chromium.args,
+      defaultViewport: isLocal ? undefined : { width: 1280, height: 720 },
+      executablePath,
+      headless: true,
+    });
+
+    const page = await browser.newPage();
+
+    // Generate HTML content for PDF
+    const htmlContent = generatePDFHTML(image, feedbackWithComments);
+
+    await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
+
+    // Generate PDF
+    const pdfBuffer = await page.pdf({
+      format: 'A4',
+      printBackground: true,
+      margin: {
+        top: '20mm',
+        right: '20mm',
+        bottom: '20mm',
+        left: '20mm'
+      }
+    });
+
+    await browser.close();
+
+    // Set filename for download
+    const filename = `${image.filename.split('.')[0]}_feedback_report_${new Date().toISOString().split('T')[0]}.pdf`;
+
+    return new Response(Buffer.from(pdfBuffer), {
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="${filename}"`,
+      },
+    });
+
+  } catch (error) {
+    console.error('PDF export error:', error);
+
+    if (browser) {
+      await browser.close();
+    }
+
+    return NextResponse.json(
+      { success: false, error: 'Failed to generate PDF report' },
+      { status: 500 }
+    );
+  }
 }
 
-function generatePDFHTML(image: IImage, feedback: (IFeedbackItem & { comments: any[] })[]): string {
-    const severityColors: Record<string, string> = {
-        high: '#ef4444',
-        medium: '#f59e0b',
-        low: '#10b981'
-    };
+function generatePDFHTML(image: IImage, feedback: Array<IFeedbackItem & { comments: Array<{ id: string; body: string; author: { name?: string } | null; createdAt: Date }> }>): string {
+  const severityColors: Record<string, string> = {
+    high: '#ef4444',
+    medium: '#f59e0b',
+    low: '#10b981'
+  };
 
-    const categoryColors: Record<string, string> = {
-        accessibility: '#ef4444',
-        visual_hierarchy: '#3b82f6',
-        copy: '#10b981',
-        ui_pattern: '#8b5cf6'
-    };
 
-    const severityBreakdown = {
-        high: feedback.filter(item => item.severity === 'high').length,
-        medium: feedback.filter(item => item.severity === 'medium').length,
-        low: feedback.filter(item => item.severity === 'low').length
-    };
+  const severityBreakdown = {
+    high: feedback.filter(item => item.severity === 'high').length,
+    medium: feedback.filter(item => item.severity === 'medium').length,
+    low: feedback.filter(item => item.severity === 'low').length
+  };
 
-    const categoryBreakdown = {
-        accessibility: feedback.filter(item => item.category === 'accessibility').length,
-        visual_hierarchy: feedback.filter(item => item.category === 'visual_hierarchy').length,
-        copy: feedback.filter(item => item.category === 'copy').length,
-        ui_pattern: feedback.filter(item => item.category === 'ui_pattern').length
-    };
+  const categoryBreakdown = {
+    accessibility: feedback.filter(item => item.category === 'accessibility').length,
+    visual_hierarchy: feedback.filter(item => item.category === 'visual_hierarchy').length,
+    copy: feedback.filter(item => item.category === 'copy').length,
+    ui_pattern: feedback.filter(item => item.category === 'ui_pattern').length
+  };
 
-    return `
+  return `
     <!DOCTYPE html>
     <html>
     <head>
@@ -446,7 +464,7 @@ function generatePDFHTML(image: IImage, feedback: (IFeedbackItem & { comments: a
             ${item.comments.length > 0 ? `
               <div class="comments-section">
                 <div class="comments-title">Comments (${item.comments.length})</div>
-                ${item.comments.map((comment: any) => `
+                ${item.comments.map((comment: { body: string; author: { name?: string } | null; createdAt: Date }) => `
                   <div class="comment">
                     <div class="comment-body">${comment.body}</div>
                     <div class="comment-meta">

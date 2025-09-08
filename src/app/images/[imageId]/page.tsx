@@ -88,23 +88,6 @@ export default function ImageViewerPage() {
     const router = useRouter();
     const imageId = params.imageId as string;
 
-    // Redirect if not authenticated
-    if (!isLoaded) {
-        return (
-            <div className="min-h-screen bg-background flex items-center justify-center">
-                <div className="text-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-                    <p className="text-muted-foreground">Loading...</p>
-                </div>
-            </div>
-        );
-    }
-
-    if (!isSignedIn) {
-        router.push('/sign-in');
-        return null;
-    }
-
     const [imageData, setImageData] = useState<ImageData | null>(null);
     const [feedback, setFeedback] = useState<FeedbackItem[]>([]);
     const [filteredFeedback, setFilteredFeedback] = useState<FeedbackItem[]>([]);
@@ -117,20 +100,6 @@ export default function ImageViewerPage() {
 
     const imageRef = useRef<HTMLImageElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-        if (imageId) {
-            fetchImageData();
-        }
-    }, [imageId]);
-
-    useEffect(() => {
-        if (selectedRole === 'all') {
-            setFilteredFeedback(feedback);
-        } else {
-            setFilteredFeedback(feedback.filter(item => item.roles.includes(selectedRole)));
-        }
-    }, [feedback, selectedRole]);
 
     const fetchImageData = async () => {
         try {
@@ -150,6 +119,43 @@ export default function ImageViewerPage() {
             setLoading(false);
         }
     };
+
+    // Redirect if not authenticated
+    useEffect(() => {
+        if (!isLoaded) return;
+        if (!isSignedIn) {
+            router.push('/sign-in');
+        }
+    }, [isLoaded, isSignedIn, router]);
+
+    useEffect(() => {
+        if (imageId) {
+            fetchImageData();
+        }
+    }, [imageId]);
+
+    useEffect(() => {
+        if (selectedRole === 'all') {
+            setFilteredFeedback(feedback);
+        } else {
+            setFilteredFeedback(feedback.filter(item => item.roles.includes(selectedRole)));
+        }
+    }, [feedback, selectedRole]);
+
+    if (!isLoaded) {
+        return (
+            <div className="min-h-screen bg-background flex items-center justify-center">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                    <p className="text-muted-foreground">Loading...</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (!isSignedIn) {
+        return null;
+    }
 
     const fetchComments = async (feedbackId: string) => {
         try {
@@ -244,60 +250,72 @@ export default function ImageViewerPage() {
         <div className="min-h-screen bg-background">
             {/* Header */}
             <header className="border-b">
-                <div className="container mx-auto px-4 py-4">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-4">
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => router.push(`/projects/${imageData.projectId}`)}
-                            >
-                                <ArrowLeft className="w-4 h-4 mr-2" />
-                                Back to Project
-                            </Button>
-                            <div>
-                                <h1 className="text-xl font-bold">{imageData.filename}</h1>
-                                <p className="text-sm text-muted-foreground">
-                                    {filteredFeedback.length} feedback items
-                                </p>
-                            </div>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center h-auto sm:h-16 px-4 py-3 sm:py-0 gap-3 sm:gap-0">
+                    {/* Back button - far left */}
+                    <div className="flex-shrink-0">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => router.push(`/projects/${imageData.projectId}`)}
+                        >
+                            <ArrowLeft className="w-4 h-4 mr-2" />
+                            <span className="hidden sm:inline">Back to Project</span>
+                            <span className="sm:hidden">Back</span>
+                        </Button>
+                    </div>
+
+                    {/* Filename - aligned with image start */}
+                    <div className="flex-1 flex justify-center">
+                        <div className="text-center">
+                            <h1 className="text-lg sm:text-xl font-bold truncate max-w-[200px] sm:max-w-none">
+                                {imageData.filename}
+                            </h1>
+                            <p className="text-xs sm:text-sm text-muted-foreground">
+                                {filteredFeedback.length} feedback items
+                            </p>
                         </div>
-                        <div className="flex items-center space-x-2">
-                            <select
-                                value={selectedRole}
-                                onChange={(e) => setSelectedRole(e.target.value)}
-                                className="px-3 py-2 border border-input bg-background rounded-md text-sm"
-                            >
-                                {ROLE_OPTIONS.map(option => (
-                                    <option key={option.value} value={option.value}>
-                                        {option.label}
-                                    </option>
-                                ))}
-                            </select>
+                    </div>
+
+                    {/* Controls - far right */}
+                    <div className="flex-shrink-0 flex items-center space-x-1 sm:space-x-2 w-full sm:w-auto justify-between sm:justify-end">
+                        <select
+                            value={selectedRole}
+                            onChange={(e) => setSelectedRole(e.target.value)}
+                            className="px-2 sm:px-3 py-1 sm:py-2 border border-input bg-background rounded-md text-xs sm:text-sm flex-1 sm:flex-none"
+                        >
+                            {ROLE_OPTIONS.map(option => (
+                                <option key={option.value} value={option.value}>
+                                    {option.label}
+                                </option>
+                            ))}
+                        </select>
+                        <div className="flex space-x-1">
                             <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={() => window.open(`/api/images/${imageId}/export/json`, '_blank')}
+                                className="px-2 sm:px-3"
                             >
-                                <Download className="w-4 h-4 mr-2" />
-                                JSON
+                                <Download className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
+                                <span className="hidden sm:inline">JSON</span>
                             </Button>
                             <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={() => window.open(`/api/images/${imageId}/export/pdf`, '_blank')}
+                                className="px-2 sm:px-3"
                             >
-                                <Download className="w-4 h-4 mr-2" />
-                                PDF
+                                <Download className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
+                                <span className="hidden sm:inline">PDF</span>
                             </Button>
                         </div>
                     </div>
                 </div>
             </header>
 
-            <div className="flex h-[calc(100vh-80px)]">
+            <div className="flex flex-col lg:flex-row h-[calc(100vh-80px)] sm:h-[calc(100vh-64px)]">
                 {/* Image Viewer */}
-                <div className="flex-1 p-4 overflow-auto">
+                <div className="flex-1 p-2 sm:p-4 overflow-auto">
                     <div className="flex items-center justify-center min-h-full">
                         <div ref={containerRef} className="relative inline-block">
                             <Image
@@ -332,7 +350,7 @@ export default function ImageViewerPage() {
                                         onClick={() => handleFeedbackClick(item)}
                                     >
                                         {/* Feedback indicator */}
-                                        <div className={`absolute -top-2 -left-2 w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold ${CATEGORY_COLORS[item.category]
+                                        <div className={`absolute -top-1 -left-1 sm:-top-2 sm:-left-2 w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center text-white text-xs font-bold ${CATEGORY_COLORS[item.category]
                                             }`}>
                                             {filteredFeedback.indexOf(item) + 1}
                                         </div>
@@ -344,10 +362,10 @@ export default function ImageViewerPage() {
                 </div>
 
                 {/* Feedback Panel */}
-                <div className="w-96 border-l bg-muted/50 flex flex-col">
-                    <div className="p-4 border-b">
-                        <h2 className="text-lg font-semibold flex items-center">
-                            <Filter className="w-5 h-5 mr-2" />
+                <div className="w-full lg:w-96 border-t lg:border-l bg-muted/50 flex flex-col max-h-[50vh] lg:max-h-none">
+                    <div className="p-3 sm:p-4 border-b">
+                        <h2 className="text-base sm:text-lg font-semibold flex items-center">
+                            <Filter className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
                             Feedback ({filteredFeedback.length})
                         </h2>
                     </div>
@@ -355,13 +373,13 @@ export default function ImageViewerPage() {
                     <div className="flex-1 overflow-auto">
                         {filteredFeedback.length === 0 ? (
                             <div className="p-4 text-center">
-                                <Eye className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                                <p className="text-muted-foreground">
+                                <Eye className="w-8 h-8 sm:w-12 sm:h-12 text-muted-foreground mx-auto mb-4" />
+                                <p className="text-sm text-muted-foreground">
                                     No feedback available for the selected role.
                                 </p>
                             </div>
                         ) : (
-                            <div className="space-y-2 p-4">
+                            <div className="space-y-2 p-2 sm:p-4">
                                 {filteredFeedback.map((item, index) => (
                                     <Card
                                         key={item._id}
@@ -371,25 +389,25 @@ export default function ImageViewerPage() {
                                             }`}
                                         onClick={() => handleFeedbackClick(item)}
                                     >
-                                        <CardContent className="p-4">
-                                            <div className="flex items-start space-x-3">
-                                                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-sm font-bold ${CATEGORY_COLORS[item.category]
+                                        <CardContent className="p-3 sm:p-4">
+                                            <div className="flex items-start space-x-2 sm:space-x-3">
+                                                <div className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center text-white text-xs font-bold ${CATEGORY_COLORS[item.category]
                                                     }`}>
                                                     {index + 1}
                                                 </div>
                                                 <div className="flex-1">
-                                                    <div className="flex items-center space-x-2 mb-2">
+                                                    <div className="flex items-center space-x-1 sm:space-x-2 mb-1 sm:mb-2">
                                                         {getSeverityIcon(item.severity)}
-                                                        <span className="font-semibold text-sm">{item.title}</span>
+                                                        <span className="font-semibold text-xs sm:text-sm">{item.title}</span>
                                                     </div>
-                                                    <p className="text-sm text-muted-foreground mb-2">
+                                                    <p className="text-xs sm:text-sm text-muted-foreground mb-1 sm:mb-2">
                                                         {item.text}
                                                     </p>
                                                     <div className="flex flex-wrap gap-1">
                                                         {item.roles.map(role => (
                                                             <span
                                                                 key={role}
-                                                                className="px-2 py-1 bg-secondary text-secondary-foreground text-xs rounded"
+                                                                className="px-1 sm:px-2 py-0.5 sm:py-1 bg-secondary text-secondary-foreground text-xs rounded"
                                                             >
                                                                 {role}
                                                             </span>
@@ -406,10 +424,10 @@ export default function ImageViewerPage() {
 
                     {/* Selected Feedback Details */}
                     {selectedFeedback && (
-                        <div className="border-t bg-background max-h-96 overflow-auto">
-                            <div className="p-4">
-                                <div className="flex items-center justify-between mb-4">
-                                    <h3 className="font-semibold">Feedback Details</h3>
+                        <div className="border-t bg-background max-h-[40vh] lg:max-h-96 overflow-auto">
+                            <div className="p-3 sm:p-4">
+                                <div className="flex items-center justify-between mb-3 sm:mb-4">
+                                    <h3 className="font-semibold text-sm sm:text-base">Feedback Details</h3>
                                     <Button
                                         variant="ghost"
                                         size="sm"
@@ -419,10 +437,10 @@ export default function ImageViewerPage() {
                                     </Button>
                                 </div>
 
-                                <div className="space-y-4">
+                                <div className="space-y-3 sm:space-y-4">
                                     <div>
-                                        <h4 className="text-sm font-medium mb-1">Recommendations:</h4>
-                                        <ul className="text-sm space-y-1">
+                                        <h4 className="text-xs sm:text-sm font-medium mb-1">Recommendations:</h4>
+                                        <ul className="text-xs sm:text-sm space-y-1">
                                             {selectedFeedback.recommendations.map((rec, index) => (
                                                 <li key={index} className="flex items-start space-x-2">
                                                     <span className="text-primary">•</span>
