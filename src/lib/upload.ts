@@ -2,6 +2,20 @@ import { writeFile } from 'fs/promises';
 import { join } from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import sharp from 'sharp';
+// Optional: Vercel Blob for production storage (lazy loaded)
+type PutFn = (
+    key: string,
+    data: unknown,
+    opts: Record<string, unknown>
+) => Promise<{ url: string }>;
+async function getBlobPut(): Promise<PutFn | null> {
+    try {
+        const mod = await import('@vercel/blob');
+        return (mod as unknown as { put: PutFn }).put;
+    } catch {
+        return null;
+    }
+}
 
 export interface UploadResult {
     filename: string;
@@ -61,15 +75,32 @@ export async function saveUploadedFile(
             .toBuffer();
     }
 
-    // Save file
-    await writeFile(filePath, processedBuffer);
+    let publicUrl: string | null = null;
+    // If running in an environment with Vercel Blob token, store in Blob (persistent)
+    if (process.env.BLOB_READ_WRITE_TOKEN) {
+        const put = await getBlobPut();
+        if (!put) {
+            throw new Error('Blob storage is not available in this environment');
+        }
+        const key = `${projectId}/${filename}`;
+        const result = await put(key, processedBuffer, {
+            access: 'public',
+            token: process.env.BLOB_READ_WRITE_TOKEN,
+            contentType: file.type || 'application/octet-stream',
+            cacheControl: 'public, max-age=31536000, immutable',
+        });
+        publicUrl = result.url;
+    } else {
+        // Fallback to local ephemeral storage (works locally; not persistent on serverless)
+        await writeFile(filePath, processedBuffer);
+    }
 
     // Get final dimensions
     const finalMetadata = await sharp(processedBuffer).metadata();
 
     return {
         filename,
-        url: `/api/files/${projectId}/${filename}`,
+        url: publicUrl ?? `/api/files/${projectId}/${filename}`,
         width: finalMetadata.width!,
         height: finalMetadata.height!,
         size: processedBuffer.length

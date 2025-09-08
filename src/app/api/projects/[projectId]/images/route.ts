@@ -88,18 +88,24 @@ export async function POST(
 async function analyzeImageInBackground(
     imageId: string,
     projectId: string,
-    uploadResult: { filename: string },
+    uploadResult: { filename: string; url?: string },
     mimeType: string
 ): Promise<void> {
     try {
-        // Read the uploaded file
-        const filePath = join(
-            process.env.UPLOAD_DIR || './uploads',
-            projectId,
-            uploadResult.filename
-        );
-
-        const imageBuffer = await readFile(filePath);
+        // Prefer remote URL if available (e.g., Vercel Blob); otherwise read local file
+        let imageBuffer: Buffer;
+        if (uploadResult.url && uploadResult.url.startsWith('https://')) {
+            const res = await fetch(uploadResult.url);
+            const arr = await res.arrayBuffer();
+            imageBuffer = Buffer.from(arr);
+        } else {
+            const filePath = join(
+                process.env.UPLOAD_DIR || './uploads',
+                projectId,
+                uploadResult.filename
+            );
+            imageBuffer = await readFile(filePath);
+        }
 
         // Analyze with Gemini
         const feedbackItems = await analyzeImageWithRateLimit(imageBuffer, mimeType);
