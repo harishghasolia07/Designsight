@@ -51,7 +51,12 @@ export async function GET(
                 break;
         }
 
-        return new NextResponse(fileBuffer, {
+        const arrayBuffer = fileBuffer.buffer.slice(
+            fileBuffer.byteOffset,
+            fileBuffer.byteOffset + fileBuffer.byteLength
+        ) as ArrayBuffer;
+        const blob = new Blob([arrayBuffer], { type: contentType });
+        return new Response(blob, {
             headers: {
                 'Content-Type': contentType,
                 'Cache-Control': 'public, max-age=31536000', // Cache for 1 year
