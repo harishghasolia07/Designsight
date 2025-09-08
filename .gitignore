@@ -46,3 +46,7 @@ PRD.md
 /.clerk/
 
 .cursor
+
+# uploads (local dev only, do not commit user data)
+uploads/
+!uploads/.gitkeep
