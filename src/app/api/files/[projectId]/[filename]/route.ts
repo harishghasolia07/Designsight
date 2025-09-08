@@ -24,7 +24,7 @@ export async function GET(
         // Check if file exists
         try {
             await stat(filePath);
-        } catch {
+        } catch (error) {
             return NextResponse.json(
                 { success: false, error: 'File not found' },
                 { status: 404 }
@@ -51,7 +51,7 @@ export async function GET(
                 break;
         }
 
-        return new NextResponse(new Uint8Array(fileBuffer), {
+        return new NextResponse(fileBuffer, {
             headers: {
                 'Content-Type': contentType,
                 'Cache-Control': 'public, max-age=31536000', // Cache for 1 year
