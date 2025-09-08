@@ -46,22 +46,12 @@ export default function ProjectDetailPage() {
     const router = useRouter();
     const projectId = params.projectId as string;
 
-    // Redirect if not authenticated
-    if (!isLoaded) {
-        return (
-            <div className="min-h-screen bg-background flex items-center justify-center">
-                <div className="text-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-                    <p className="text-muted-foreground">Loading...</p>
-                </div>
-            </div>
-        );
-    }
-
-    if (!isSignedIn) {
-        router.push('/sign-in');
-        return null;
-    }
+    // Redirect effect (avoid conditional hook calls)
+    useEffect(() => {
+        if (isLoaded && !isSignedIn) {
+            router.push('/sign-in');
+        }
+    }, [isLoaded, isSignedIn, router]);
 
     const [project, setProject] = useState<Project | null>(null);
     const [images, setImages] = useState<ImageItem[]>([]);
@@ -193,6 +183,38 @@ export default function ProjectDetailPage() {
                 continue;
             }
 
+            // Delay showing the card by ~2s: button shows "Uploading..." meanwhile
+            setUploading(true);
+            const tempId = `temp-${crypto.randomUUID()}`;
+            let serverRecord: ImageItem | null = null;
+            let optimisticInserted = false;
+            let usedTemp = false;
+
+            const timerId = setTimeout(() => {
+                optimisticInserted = true;
+                if (serverRecord) {
+                    const rec = serverRecord as ImageItem;
+                    setImages(prev => [rec, ...prev]);
+                    if (rec.status === 'processing') {
+                        startPollingForImage(rec._id);
+                    }
+                } else {
+                    const tempImage: ImageItem = {
+                        _id: tempId,
+                        projectId,
+                        filename: file.name,
+                        url: URL.createObjectURL(file),
+                        width: 0,
+                        height: 0,
+                        status: 'processing',
+                        uploadedAt: new Date().toISOString(),
+                    };
+                    usedTemp = true;
+                    setImages(prev => [tempImage, ...prev]);
+                }
+                setUploading(false);
+            }, 2000);
+
             const formData = new FormData();
             formData.append('image', file);
 
@@ -204,16 +226,29 @@ export default function ProjectDetailPage() {
 
                 const data = await response.json();
                 if (data.success) {
-                    setImages(prev => [data.data, ...prev]);
-                    // Start polling only for newly uploaded processing images
-                    if (data.data.status === 'processing') {
-                        startPollingForImage(data.data._id);
-                    }
+                    serverRecord = data.data as ImageItem;
+                    if (optimisticInserted) {
+                        // If temp card was shown, replace it now
+                        setImages(prev => [serverRecord!, ...prev.filter(img => img._id !== tempId)]);
+                        if (serverRecord!.status === 'processing') {
+                            startPollingForImage(serverRecord!._id);
+                        }
+                    } // else wait for timer to insert
                 } else {
+                    if (optimisticInserted && usedTemp) {
+                        setImages(prev => prev.filter(img => img._id !== tempId));
+                    }
+                    clearTimeout(timerId);
+                    setUploading(false);
                     alert(`Failed to upload ${file.name}: ${data.error}`);
                 }
             } catch (error) {
                 console.error('Upload error:', error);
+                if (optimisticInserted && usedTemp) {
+                    setImages(prev => prev.filter(img => img._id !== tempId));
+                }
+                clearTimeout(timerId);
+                setUploading(false);
                 alert(`Failed to upload ${file.name}`);
             }
         }
@@ -267,6 +302,22 @@ export default function ProjectDetailPage() {
         }
     };
 
+    // Gate rendering until Clerk loads or user is redirected
+    if (!isLoaded) {
+        return (
+            <div className="min-h-screen bg-background flex items-center justify-center">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                    <p className="text-muted-foreground">Loading...</p>
+                </div>
+            </div>
+        );
+    }
+
+    if (!isSignedIn) {
+        return null;
+    }
+
     if (loading) {
         return (
             <div className="min-h-screen bg-background flex items-center justify-center">
@@ -286,7 +337,7 @@ export default function ProjectDetailPage() {
                         <AlertCircle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                         <h3 className="text-lg font-semibold mb-2">Project not found</h3>
                         <p className="text-muted-foreground mb-4">
-                            The project you're looking for doesn't exist or you don't have access to it.
+                            The project you&apos;re looking for doesn&apos;t exist or you don&apos;t have access to it.
                         </p>
                         <Button onClick={() => router.push('/')}>
                             <ArrowLeft className="w-4 h-4 mr-2" />

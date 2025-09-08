@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongodb';
-import { Project, Image, FeedbackItem } from '@/models';
+import { Project, Image, FeedbackItem, IImage } from '@/models';
 import { saveUploadedFile } from '@/lib/upload';
 import { analyzeImageWithRateLimit } from '@/lib/gemini';
 import { readFile } from 'fs/promises';
@@ -51,25 +51,27 @@ export async function POST(
 
         await image.save();
 
-        // Start AI analysis in background
-        analyzeImageInBackground(image._id.toString(), projectId, uploadResult, file.type)
-            .catch(error => {
-                console.error('Background analysis failed:', error);
-                // Update image status to failed
-                Image.findByIdAndUpdate(image._id, { status: 'failed' }).exec();
-            });
+        // Run AI analysis synchronously to avoid serverless background task being killed
+        try {
+            await analyzeImageInBackground(image._id.toString(), projectId, uploadResult, file.type);
+        } catch (err) {
+            console.error('Synchronous analysis failed:', err);
+            await Image.findByIdAndUpdate(image._id, { status: 'failed' }).exec();
+        }
+
+        const updated = await Image.findById(image._id).lean<IImage>().exec();
 
         return NextResponse.json({
             success: true,
             data: {
-                _id: image._id,
-                projectId: image.projectId,
-                filename: image.filename,
-                url: image.url,
-                width: image.width,
-                height: image.height,
-                status: image.status,
-                uploadedAt: image.uploadedAt
+                _id: updated!._id,
+                projectId: updated!.projectId,
+                filename: updated!.filename,
+                url: updated!.url,
+                width: updated!.width,
+                height: updated!.height,
+                status: updated!.status,
+                uploadedAt: updated!.uploadedAt
             }
         }, { status: 201 });
 
