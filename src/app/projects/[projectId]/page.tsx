@@ -434,24 +434,20 @@ export default function ProjectDetailPage() {
                                 id="file-upload"
                             />
                             <Button disabled={uploading} size="sm" className="sm:size-default">
-                                <label
-                                    htmlFor="file-upload"
-                                    className="cursor-pointer flex flex-col items-center justify-center"
-                                >
+                                <label htmlFor="file-upload" className="cursor-pointer">
                                     {uploading ? (
                                         <>
-                                            <RefreshCw className="w-4 h-4 animate-spin mt-1" />
+                                            <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
                                             Uploading...
                                         </>
                                     ) : (
                                         <>
-                                            <Upload className="w-5 h-5 pt-1" />
-                                            <div className="pb-1">Choose Files</div>
+                                            <Upload className="w-4 h-4 mr-2" />
+                                            Choose Files
                                         </>
                                     )}
                                 </label>
                             </Button>
-
                         </div>
                     </CardContent>
                 </Card>

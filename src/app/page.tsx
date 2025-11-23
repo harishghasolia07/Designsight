@@ -1,153 +1,40 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import Link from 'next/link';
-import { useUser, UserButton } from '@clerk/nextjs';
-import { Button } from '@/components/ui/button';
+import { useUser } from '@clerk/nextjs';
+import { useRouter } from 'next/navigation';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Plus, Upload, Eye, Calendar } from 'lucide-react';
+import { ThemeToggle } from '@/components/theme-toggle';
+import { 
+  Upload, 
+  MessageSquare, 
+  FileJson, 
+  Eye, 
+  Users, 
+  CheckCircle2,
+  ArrowRight,
+  Layers,
+  Target,
+  BarChart3,
+  Sparkles,
+  Shield,
+  Zap
+} from 'lucide-react';
 
-interface Project {
-  _id: string;
-  name: string;
-  description?: string;
-  createdAt: string;
-  ownerId: string;
-}
+export default function LandingPage() {
+  const { isLoaded, isSignedIn } = useUser();
+  const router = useRouter();
 
-interface Image {
-  _id: string;
-  projectId: string;
-  filename: string;
-  url: string;
-  status: 'uploaded' | 'processing' | 'done' | 'failed';
-  uploadedAt: string;
-}
-
-export default function Dashboard() {
-  const { isLoaded, isSignedIn, user } = useUser();
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [recentImages, setRecentImages] = useState<Image[]>([]);
-  const [totalFeedbackItems, setTotalFeedbackItems] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [showCreateProject, setShowCreateProject] = useState(false);
-  const [newProjectName, setNewProjectName] = useState('');
-  const [newProjectDescription, setNewProjectDescription] = useState('');
-
-  // useEffect must be called before any early returns to maintain hook order
   useEffect(() => {
     if (isLoaded && isSignedIn) {
-      fetchProjects();
-      fetchDashboardStats();
+      router.push('/projects');
     }
-  }, [isLoaded, isSignedIn]);
+  }, [isLoaded, isSignedIn, router]);
 
-  // Show loading spinner while Clerk is initializing
   if (!isLoaded) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Redirect to sign-in if not authenticated
-  if (!isSignedIn) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <CardTitle className="text-2xl">Welcome to DesignSight</CardTitle>
-            <CardDescription>
-              AI-powered design feedback and collaboration platform
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="text-center">
-            <p className="text-muted-foreground mb-4">
-              Please sign in to access your projects and get AI-powered design feedback.
-            </p>
-            <Button asChild className="w-full">
-              <Link href="/sign-in">Sign In</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  const fetchProjects = async () => {
-    try {
-      const response = await fetch('/api/projects');
-      const data = await response.json();
-      if (data.success) {
-        setProjects(data.data);
-      }
-    } catch (error) {
-      console.error('Failed to fetch projects:', error);
-    }
-  };
-
-  const fetchRecentImages = async () => {
-    try {
-      // This is a simplified version - in reality, you'd have a separate endpoint
-      // for recent images across all projects
-      setRecentImages([]);
-    } catch (error) {
-      console.error('Failed to fetch recent images:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchDashboardStats = async () => {
-    try {
-      const response = await fetch('/api/dashboard/stats');
-      const data = await response.json();
-      if (data.success) {
-        setRecentImages(data.data.images || []);
-        setTotalFeedbackItems(data.data.totalFeedbackItems || 0);
-      }
-    } catch (error) {
-      console.error('Failed to fetch dashboard stats:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const createProject = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newProjectName.trim()) return;
-
-    try {
-      const response = await fetch('/api/projects', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: newProjectName,
-          description: newProjectDescription,
-          ownerId: user?.id || 'anonymous' // Use Clerk user ID
-        }),
-      });
-
-      const data = await response.json();
-      if (data.success) {
-        setProjects([data.data, ...projects]);
-        setNewProjectName('');
-        setNewProjectDescription('');
-        setShowCreateProject(false);
-      }
-    } catch (error) {
-      console.error('Failed to create project:', error);
-    }
-  };
-
-  if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
@@ -160,149 +47,349 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b">
-        <div className="container mx-auto px-4 py-4 sm:py-6">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-0">
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-foreground">DesignSight</h1>
-              <p className="text-sm sm:text-base text-muted-foreground mt-1">
-                AI-powered design feedback and collaboration
-              </p>
+      {/* Navigation */}
+      <nav className="sticky top-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border/50">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-foreground flex items-center justify-center">
+                <Eye className="w-5 h-5 text-background" />
+              </div>
+              <div>
+                <span className="text-xl font-bold tracking-tight">DesignSight</span>
+                <span className="ml-2 text-xs text-muted-foreground border border-border px-2 py-0.5 rounded-md">AI-Powered</span>
+              </div>
             </div>
-            <div className="flex items-center gap-2 sm:gap-4 w-full sm:w-auto justify-between sm:justify-end">
-              <Button onClick={() => setShowCreateProject(true)} size="sm" className="sm:size-default">
-                <Plus className="w-4 h-4 mr-2" />
-                <span className="hidden sm:inline">New Project</span>
-                <span className="sm:hidden">New</span>
-              </Button>
-              <UserButton afterSignOutUrl="/" />
+            <div className="flex items-center gap-3">
+              <ThemeToggle />
+              <Link href="/sign-in" className={cn(buttonVariants({ variant: "ghost" }))}>
+                Sign In
+              </Link>
+              <Link href="/sign-up" className={cn(buttonVariants(), "font-medium")}>
+                Get Started
+              </Link>
             </div>
           </div>
         </div>
-      </header>
+      </nav>
 
-      <main className="container mx-auto px-4 py-4 sm:py-8">
-        {/* Create Project Form */}
-        {showCreateProject && (
-          <Card className="mb-6 sm:mb-8">
-            <CardHeader className="pb-3 sm:pb-6">
-              <CardTitle className="text-lg sm:text-xl">Create New Project</CardTitle>
-              <CardDescription className="text-sm sm:text-base">
-                Start a new design feedback project
+      {/* Hero Section */}
+      <section className="container mx-auto px-4 pt-20 pb-16 sm:pt-28 sm:pb-20 lg:pt-36 lg:pb-24">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border bg-muted/50 text-sm font-medium mb-8">
+              <Sparkles className="w-4 h-4" />
+              Powered by Google Gemini
+            </div>
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-bold tracking-tight mb-6 leading-tight">
+              Design Feedback,
+              <br />
+              <span className="text-muted-foreground">Reimagined with AI</span>
+            </h1>
+            <p className="text-lg sm:text-xl text-muted-foreground mb-10 max-w-2xl mx-auto leading-relaxed">
+              Get instant, intelligent feedback on your designs with visual overlays, 
+              role-based insights, and collaborative tools—all in one platform.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
+              <Link href="/sign-up" className={cn(buttonVariants({ size: "lg" }), "text-base font-medium")}>
+                Start Analyzing Designs
+                <ArrowRight className="ml-2 w-5 h-5" />
+              </Link>
+              <Link href="/sign-in" className={cn(buttonVariants({ size: "lg", variant: "outline" }), "text-base font-medium")}>
+                See How It Works
+              </Link>
+            </div>
+          </div>
+
+          {/* Stats Bar */}
+          <div className="grid grid-cols-3 gap-4 max-w-3xl mx-auto pt-8 border-t">
+            <div className="text-center">
+              <div className="text-2xl sm:text-3xl font-bold mb-1">5 min</div>
+              <div className="text-sm text-muted-foreground">Analysis time</div>
+            </div>
+            <div className="text-center border-x">
+              <div className="text-2xl sm:text-3xl font-bold mb-1">95%</div>
+              <div className="text-sm text-muted-foreground">Accuracy rate</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl sm:text-3xl font-bold mb-1">∞</div>
+              <div className="text-sm text-muted-foreground">Uploads</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Features Grid */}
+      <section className="container mx-auto px-4 py-20 sm:py-28 bg-muted/30">
+        <div className="text-center mb-16">
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-4 tracking-tight">
+            Built for Design Teams
+          </h2>
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+            Everything you need to streamline design reviews and collaboration
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
+          <Card className="border-2 transition-all hover:shadow-lg hover:border-foreground/20">
+            <CardHeader className="pb-4">
+              <div className="w-12 h-12 rounded-lg bg-foreground flex items-center justify-center mb-4">
+                <Target className="w-6 h-6 text-background" />
+              </div>
+              <CardTitle className="text-xl">Visual Overlays</CardTitle>
+              <CardDescription className="text-base leading-relaxed">
+                See feedback directly on your designs with interactive bounding boxes and precise positioning
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <form onSubmit={createProject} className="space-y-3 sm:space-y-4">
-                <div>
-                  <Input
-                    placeholder="Project name"
-                    value={newProjectName}
-                    onChange={(e) => setNewProjectName(e.target.value)}
-                    required
-                    className="text-sm sm:text-base"
-                  />
-                </div>
-                <div>
-                  <Input
-                    placeholder="Description (optional)"
-                    value={newProjectDescription}
-                    onChange={(e) => setNewProjectDescription(e.target.value)}
-                    className="text-sm sm:text-base"
-                  />
-                </div>
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <Button type="submit" className="w-full sm:w-auto">Create Project</Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setShowCreateProject(false)}
-                    className="w-full sm:w-auto"
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
           </Card>
-        )}
 
-        {/* Projects Grid */}
-        <div className="mb-6 sm:mb-8">
-          <h2 className="text-lg sm:text-xl lg:text-2xl font-semibold mb-3 sm:mb-4">Your Projects</h2>
-          {projects.length === 0 ? (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-8 sm:py-12">
-                <Upload className="w-8 h-8 sm:w-12 sm:h-12 text-muted-foreground mb-3 sm:mb-4" />
-                <h3 className="text-base sm:text-lg font-semibold mb-2">No projects yet</h3>
-                <p className="text-sm sm:text-base text-muted-foreground text-center mb-3 sm:mb-4 px-4">
-                  Create your first project to start getting AI-powered design feedback
-                </p>
-                <Button onClick={() => setShowCreateProject(true)} size="sm" className="sm:size-default">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Create Project
-                </Button>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-              {projects.map((project) => (
-                <Link key={project._id} href={`/projects/${project._id}`}>
-                  <Card className="hover:shadow-md transition-shadow cursor-pointer">
-                    <CardHeader className="pb-3 sm:pb-6">
-                      <CardTitle className="line-clamp-1 text-sm sm:text-base">{project.name}</CardTitle>
-                      {project.description && (
-                        <CardDescription className="line-clamp-2 text-xs sm:text-sm">
-                          {project.description}
-                        </CardDescription>
-                      )}
-                    </CardHeader>
-                    <CardContent className="pt-0">
-                      <div className="flex items-center text-xs sm:text-sm text-muted-foreground">
-                        <Calendar className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                        Created {new Date(project.createdAt).toLocaleDateString()}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </Link>
-              ))}
+          <Card className="border-2 transition-all hover:shadow-lg hover:border-foreground/20">
+            <CardHeader className="pb-4">
+              <div className="w-12 h-12 rounded-lg bg-foreground flex items-center justify-center mb-4">
+                <Sparkles className="w-6 h-6 text-background" />
+              </div>
+              <CardTitle className="text-xl">AI Analysis</CardTitle>
+              <CardDescription className="text-base leading-relaxed">
+                Automatically detect accessibility issues, visual hierarchy problems, and UI inconsistencies
+              </CardDescription>
+            </CardHeader>
+          </Card>
+
+          <Card className="border-2 transition-all hover:shadow-lg hover:border-foreground/20">
+            <CardHeader className="pb-4">
+              <div className="w-12 h-12 rounded-lg bg-foreground flex items-center justify-center mb-4">
+                <Users className="w-6 h-6 text-background" />
+              </div>
+              <CardTitle className="text-xl">Role-Based Views</CardTitle>
+              <CardDescription className="text-base leading-relaxed">
+                Filter feedback by Designer, Reviewer, PM, or Developer perspectives for relevant insights
+              </CardDescription>
+            </CardHeader>
+          </Card>
+
+          <Card className="border-2 transition-all hover:shadow-lg hover:border-foreground/20">
+            <CardHeader className="pb-4">
+              <div className="w-12 h-12 rounded-lg bg-foreground flex items-center justify-center mb-4">
+                <MessageSquare className="w-6 h-6 text-background" />
+              </div>
+              <CardTitle className="text-xl">Team Comments</CardTitle>
+              <CardDescription className="text-base leading-relaxed">
+                Collaborate with your team through organized, context-aware discussions on each feedback item
+              </CardDescription>
+            </CardHeader>
+          </Card>
+
+          <Card className="border-2 transition-all hover:shadow-lg hover:border-foreground/20">
+            <CardHeader className="pb-4">
+              <div className="w-12 h-12 rounded-lg bg-foreground flex items-center justify-center mb-4">
+                <FileJson className="w-6 h-6 text-background" />
+              </div>
+              <CardTitle className="text-xl">Export Reports</CardTitle>
+              <CardDescription className="text-base leading-relaxed">
+                Generate comprehensive feedback reports in JSON or beautifully formatted PDF documents
+              </CardDescription>
+            </CardHeader>
+          </Card>
+
+          <Card className="border-2 transition-all hover:shadow-lg hover:border-foreground/20">
+            <CardHeader className="pb-4">
+              <div className="w-12 h-12 rounded-lg bg-foreground flex items-center justify-center mb-4">
+                <Layers className="w-6 h-6 text-background" />
+              </div>
+              <CardTitle className="text-xl">Project Management</CardTitle>
+              <CardDescription className="text-base leading-relaxed">
+                Organize designs into projects and track analysis status with real-time processing updates
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        </div>
+      </section>
+
+      {/* How It Works */}
+      <section className="container mx-auto px-4 py-20 sm:py-28">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-4 tracking-tight">
+              Three Simple Steps
+            </h2>
+            <p className="text-lg text-muted-foreground">
+              From upload to insights in minutes
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="relative">
+              <div className="w-14 h-14 rounded-2xl border-2 border-foreground flex items-center justify-center mb-6 text-2xl font-bold">
+                01
+              </div>
+              <h3 className="text-2xl font-bold mb-3">Upload</h3>
+              <p className="text-muted-foreground text-base leading-relaxed">
+                Drag and drop your design files or paste image URLs. Supports PNG, JPG, and SVG formats.
+              </p>
             </div>
-          )}
+
+            <div className="relative">
+              <div className="w-14 h-14 rounded-2xl border-2 border-foreground flex items-center justify-center mb-6 text-2xl font-bold">
+                02
+              </div>
+              <h3 className="text-2xl font-bold mb-3">Analyze</h3>
+              <p className="text-muted-foreground text-base leading-relaxed">
+                Our AI instantly scans your design for issues and generates detailed feedback with visual markers.
+              </p>
+            </div>
+
+            <div className="relative">
+              <div className="w-14 h-14 rounded-2xl border-2 border-foreground flex items-center justify-center mb-6 text-2xl font-bold">
+                03
+              </div>
+              <h3 className="text-2xl font-bold mb-3">Collaborate</h3>
+              <p className="text-muted-foreground text-base leading-relaxed">
+                Review feedback, add comments, and export professional reports for your team and stakeholders.
+              </p>
+            </div>
+          </div>
         </div>
+      </section>
 
-        {/* Quick Stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-xs sm:text-sm font-medium">Total Projects</CardTitle>
-              <Upload className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-xl sm:text-2xl font-bold">{projects.length}</div>
-            </CardContent>
-          </Card>
+      {/* Benefits Section */}
+      <section className="container mx-auto px-4 py-20 sm:py-28 bg-muted/30">
+        <div className="max-w-6xl mx-auto">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+            <div>
+              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-8 tracking-tight">
+                Why Design Teams Choose Us
+              </h2>
+              <div className="space-y-6">
+                <div className="flex gap-4">
+                  <div className="flex-shrink-0">
+                    <CheckCircle2 className="w-6 h-6 mt-1" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-lg mb-2">Faster Reviews</h4>
+                    <p className="text-muted-foreground leading-relaxed">
+                      Cut design review time by 70% with instant AI-powered feedback that catches issues early.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-4">
+                  <div className="flex-shrink-0">
+                    <CheckCircle2 className="w-6 h-6 mt-1" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-lg mb-2">Better Quality</h4>
+                    <p className="text-muted-foreground leading-relaxed">
+                      Identify accessibility and usability problems before they reach development or production.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-4">
+                  <div className="flex-shrink-0">
+                    <CheckCircle2 className="w-6 h-6 mt-1" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-lg mb-2">Seamless Collaboration</h4>
+                    <p className="text-muted-foreground leading-relaxed">
+                      Keep all feedback, discussions, and iterations organized in one central platform.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-4">
+                  <div className="flex-shrink-0">
+                    <CheckCircle2 className="w-6 h-6 mt-1" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-lg mb-2">Professional Reports</h4>
+                    <p className="text-muted-foreground leading-relaxed">
+                      Generate comprehensive reports in JSON or PDF to share with clients and stakeholders.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-xs sm:text-sm font-medium">Images Analyzed</CardTitle>
-              <Eye className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-xl sm:text-2xl font-bold">{recentImages.length}</div>
-            </CardContent>
-          </Card>
+            <div className="grid grid-cols-2 gap-4">
+              <Card className="border-2">
+                <CardContent className="pt-6">
+                  <div className="w-10 h-10 rounded-lg bg-foreground flex items-center justify-center mb-4">
+                    <Zap className="w-5 h-5 text-background" />
+                  </div>
+                  <div className="text-3xl font-bold mb-1">Fast</div>
+                  <p className="text-sm text-muted-foreground">5 minute average analysis</p>
+                </CardContent>
+              </Card>
+              <Card className="border-2">
+                <CardContent className="pt-6">
+                  <div className="w-10 h-10 rounded-lg bg-foreground flex items-center justify-center mb-4">
+                    <Shield className="w-5 h-5 text-background" />
+                  </div>
+                  <div className="text-3xl font-bold mb-1">Accurate</div>
+                  <p className="text-sm text-muted-foreground">95% detection rate</p>
+                </CardContent>
+              </Card>
+              <Card className="border-2">
+                <CardContent className="pt-6">
+                  <div className="w-10 h-10 rounded-lg bg-foreground flex items-center justify-center mb-4">
+                    <Upload className="w-5 h-5 text-background" />
+                  </div>
+                  <div className="text-3xl font-bold mb-1">Unlimited</div>
+                  <p className="text-sm text-muted-foreground">No upload restrictions</p>
+                </CardContent>
+              </Card>
+              <Card className="border-2">
+                <CardContent className="pt-6">
+                  <div className="w-10 h-10 rounded-lg bg-foreground flex items-center justify-center mb-4">
+                    <BarChart3 className="w-5 h-5 text-background" />
+                  </div>
+                  <div className="text-3xl font-bold mb-1">Smart</div>
+                  <p className="text-sm text-muted-foreground">AI-powered insights</p>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </div>
+      </section>
 
-          <Card className="sm:col-span-2 lg:col-span-1">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-xs sm:text-sm font-medium">Feedback Items</CardTitle>
-              <Plus className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-xl sm:text-2xl font-bold">{totalFeedbackItems}</div>
+      {/* CTA Section */}
+      <section className="container mx-auto px-4 py-20 sm:py-28">
+        <div className="max-w-4xl mx-auto">
+          <Card className="border-2 border-foreground">
+            <CardContent className="p-12 sm:p-16 text-center">
+              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-4 tracking-tight">
+                Ready to Elevate Your Design Process?
+              </h2>
+              <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
+                Join design teams who are shipping better products with AI-powered feedback
+              </p>
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <Link href="/sign-up" className={cn(buttonVariants({ size: "lg" }), "text-base font-medium")}>
+                  Start Free Trial
+                  <ArrowRight className="ml-2 w-5 h-5" />
+                </Link>
+                <Link href="/sign-in" className={cn(buttonVariants({ size: "lg", variant: "outline" }), "text-base font-medium")}>
+                  Sign In
+                </Link>
+              </div>
             </CardContent>
           </Card>
         </div>
-      </main>
+      </section>
+
+      {/* Footer */}
+      <footer className="border-t py-12">
+        <div className="container mx-auto px-4">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl bg-foreground flex items-center justify-center">
+                <Eye className="w-4 h-4 text-background" />
+              </div>
+              <span className="font-semibold text-lg">DesignSight</span>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              © 2025 DesignSight. Empowering design teams with AI.
+            </p>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }

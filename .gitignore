@@ -41,6 +41,11 @@ yarn-error.log*
 next-env.d.ts
 
 PRD.md
+COORDINATE_MAPPING_EXPLANATION.md
+DEPLOYMENT_QUICK_FIX.md
+DesignSight - MERN Prototype Assignment.md
+INTERVIEW_GUIDE.md
+Projects.md
 
 # clerk configuration (can include secrets)
 /.clerk/
@@ -50,3 +55,11 @@ PRD.md
 # uploads (local dev only, do not commit user data)
 uploads/
 !uploads/.gitkeep
+.clinerules/byterover-rules.md
+.kilocode/rules/byterover-rules.md
+.roo/rules/byterover-rules.md
+.windsurf/rules/byterover-rules.md
+.cursor/rules/byterover-rules.mdc
+.kiro/steering/byterover-rules.md
+.qoder/rules/byterover-rules.md
+.augment/rules/byterover-rules.md
