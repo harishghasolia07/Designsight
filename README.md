@@ -5,6 +5,7 @@ DesignSight is a comprehensive design feedback platform that leverages AI to pro
 ## 🚀 Features
 
 - **AI-Powered Analysis**: Automatic design feedback using Google's Gemini API
+- **Rate Limiting Protection**: Multi-layer rate limiting to prevent API abuse
 - **Role-Based Filtering**: Filter feedback by Designer, Reviewer, PM, or Developer roles
 - **Visual Overlays**: Interactive feedback overlays directly on design images
 - **Threaded Comments**: Collaborative discussion on feedback items
@@ -62,6 +63,12 @@ MAX_FILE_SIZE=10485760
 # Gemini AI API (Required)
 GEMINI_API_KEY=your-gemini-api-key-here
 GEMINI_MODEL=gemini-1.5-flash
+
+# Rate Limiting (Optional - defaults shown)
+RATE_LIMIT_GEMINI_PER_MINUTE=5        # Image analyses per minute per user
+RATE_LIMIT_GEMINI_PER_DAY=100         # Image analyses per day per user
+RATE_LIMIT_API_PER_15MIN=100          # General API calls per 15 min
+RATE_LIMIT_AUTH_PER_15MIN=5           # Auth attempts per 15 min
 
 # JWT Authentication
 JWT_SECRET=your-jwt-secret-here
@@ -174,16 +181,58 @@ npm test
 npm run test:watch
 ```
 
+## 🛡️ Rate Limiting & Security
+
+### Built-in Rate Limiting
+
+The application includes **comprehensive rate limiting** to protect the Gemini API from abuse:
+
+- ✅ **Per-User Limits**: 5 image analyses per minute, 100 per day
+- ✅ **IP-Based Fallback**: Rate limiting works for anonymous users too
+- ✅ **Sliding Window**: Accurate tracking with automatic cleanup
+- ✅ **Standard Headers**: HTTP 429 responses with `Retry-After` headers
+- ✅ **Configurable**: Adjust limits via environment variables
+
+**Rate Limiting Flow:**
+```
+User Upload → Rate Check → Within Limits? → Process Image
+                              ↓ No
+                          429 Error
+                          + Retry Info
+```
+
+**Response when limit exceeded:**
+```json
+{
+  "error": "Too many image analysis requests. Please wait before uploading more images.",
+  "limit": 5,
+  "remaining": 0,
+  "reset": 1700000000,
+  "retryAfter": 45
+}
+```
+
+**Default Limits:**
+- 🕐 **Per Minute**: 5 image analyses per user
+- 📅 **Per Day**: 100 image analyses per user
+- 🌐 **API Calls**: 100 requests per 15 minutes
+- 🔐 **Auth Attempts**: 5 per 15 minutes per IP
+
+📖 See [RATE_LIMIT_GUIDE.md](./RATE_LIMIT_GUIDE.md) for detailed configuration and usage.
+
 ## 🔒 Security Considerations
 
 ### For Production Deployment:
 
-1. **Authentication**: Implement proper user authentication (OAuth/JWT)
-2. **File Storage**: Use cloud storage (AWS S3, Google Cloud Storage)
-3. **Database**: Use managed MongoDB service (MongoDB Atlas)
-4. **API Security**: Add rate limiting and input validation
-5. **HTTPS**: Enable SSL/TLS encryption
-6. **Environment Variables**: Secure API key management
+1. **Authentication**: ✅ Integrated with Clerk for user authentication
+2. **Rate Limiting**: ✅ Multi-layer protection with per-user tracking
+3. **File Storage**: Use cloud storage (AWS S3, Google Cloud Storage)
+4. **Database**: Use managed MongoDB service (MongoDB Atlas)
+5. **API Security**: ✅ Rate limiting enabled + input validation
+6. **HTTPS**: Enable SSL/TLS encryption
+7. **Environment Variables**: Secure API key management
+8. **CORS**: Configure appropriate CORS policies
+9. **Content Security**: Validate and sanitize file uploads
 
 ## 🐛 Troubleshooting
 

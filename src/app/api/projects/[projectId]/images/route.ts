@@ -3,6 +3,8 @@ import dbConnect from '@/lib/mongodb';
 import { Project, Image, FeedbackItem, IImage } from '@/models';
 import { saveUploadedFile } from '@/lib/upload';
 import { analyzeImageWithRateLimit } from '@/lib/gemini';
+import { checkMultipleRateLimitsMiddleware } from '@/lib/rate-limit-middleware';
+import { RateLimitPresets } from '@/lib/rate-limiter';
 import { readFile } from 'fs/promises';
 import { join } from 'path';
 
@@ -11,6 +13,19 @@ export async function POST(
     { params }: { params: Promise<{ projectId: string }> }
 ) {
     try {
+        // Apply rate limiting for Gemini API (per-minute and per-day limits)
+        const rateLimitError = await checkMultipleRateLimitsMiddleware(
+            request,
+            [
+                { name: 'gemini-minute', config: RateLimitPresets.GEMINI_ANALYSIS },
+                { name: 'gemini-daily', config: RateLimitPresets.GEMINI_DAILY }
+            ]
+        );
+
+        if (rateLimitError) {
+            return rateLimitError;
+        }
+
         await dbConnect();
 
         const { projectId } = await params;
